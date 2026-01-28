@@ -12,10 +12,14 @@ for the service
 3. Add the service to the array of services
 */ 
 extern service_t service_wifi;
+extern service_t service_keyboard;
+extern service_t service_gsm;
 // extern service_t service_net;
 
 static service_t *services[] = {
     &service_wifi,
+    &service_keyboard,
+    &service_gsm,
 //     &service_net,
 };
 /* ------------------------------ */
