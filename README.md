@@ -77,6 +77,3 @@ pio device monitor
 - [ ] Full GSM integration (In progress).
 - [ ] Hardware audio path validation.
 
-## License
-
-*(Specify your license here, e.g., MIT, GPLv3, etc.)*
