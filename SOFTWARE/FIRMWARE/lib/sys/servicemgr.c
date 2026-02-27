@@ -14,12 +14,14 @@ for the service
 extern service_t service_wifi;
 extern service_t service_keyboard;
 extern service_t service_gsm;
+extern service_t service_display;
 // extern service_t service_net;
 
 static service_t *services[] = {
     &service_wifi,
     &service_keyboard,
     &service_gsm,
+    &service_display,
 //     &service_net,
 };
 /* ------------------------------ */

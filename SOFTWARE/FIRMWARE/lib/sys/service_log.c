@@ -1,6 +1,10 @@
 #include "service_log.h"
 #include <stdarg.h>
 
+__attribute__((weak)) void service_log_print_serial(const char *msg) {
+    // default weak implementation does nothing
+}
+
 void service_log_write(service_status_t *st, const char *fmt, ...){
     va_list ap;
     size_t len = strlen(st->log);
@@ -14,4 +18,7 @@ void service_log_write(service_status_t *st, const char *fmt, ...){
               fmt,
               ap);
     va_end(ap);
+
+    char *new_log = st->log + len;
+    service_log_print_serial(new_log);
 }

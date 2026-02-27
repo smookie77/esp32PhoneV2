@@ -12,8 +12,8 @@ static service_status_t st = {
     .log = "WiFi idle"
 };
 
-#define DEFAULT_SSID    "MotorolaGearSolid"
-#define DEFUALT_PASS    "batpesho4"
+#define DEFAULT_SSID "MotorolaGearSolid"
+#define DEFAULT_PASS "batpesho4"
 
 
 
@@ -23,23 +23,22 @@ static int wifi_start(service_status_t *out){
     WiFi.mode(WIFI_STA);
 
         // Add code that reads from flash the SSID and password
-    WiFi.setHostname("SOP-PHONE");
-    WiFi.begin(DEFAULT_SSID, DEFUALT_PASS);
+    WiFi.begin(DEFAULT_SSID, DEFAULT_PASS);
     WiFi.setAutoReconnect(true);
-    SERVICE_LOG(&st, "[INFO] WiFi conecting...\n");
+    WiFi.setHostname("SOP-PHONE");
     
-    if(WiFi.status() != WL_CONNECTED){
-        st.state = SERVICE_RUNNING;
-        st.log[0] = '\0';
-        SERVICE_LOG(&st, "[ OK ] WiFi started successfully");
-        *out = st;
-    }
+    
+    st.state = SERVICE_RUNNING;
+    st.log[0] = '\0';
+    SERVICE_LOG(&st, "[INFO] WiFi started, connecting...");
 
+    *out = st;
     return 0;
 }
 
 static int wifi_stop(service_status_t *out){
-    // WiFi.disconnect();
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
 
     st.state = SERVICE_STOPPED;
     st.log[0] = '\0';
@@ -49,6 +48,14 @@ static int wifi_stop(service_status_t *out){
 }
 
 static void wifi_status(service_status_t *out){
+    if (st.state == SERVICE_RUNNING) {
+        st.log[0] = '\0';
+        if (WiFi.status() == WL_CONNECTED) {
+            SERVICE_LOG(&st, "[ OK ] Connected: %s", WiFi.localIP().toString().c_str());
+        } else {
+            SERVICE_LOG(&st, "[INFO] Connecting...");
+        }
+    }
     *out = st;
 }
 

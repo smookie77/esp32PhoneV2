@@ -1,171 +1,143 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <U8g2lib.h>
-#include <bitmaps.h>
+#include <WiFi.h>
+#include <time.h>
+#include "esp_bt.h"
 #include <services.h>
 #include <servicemgr.h>
+#include <phone_gui.h>
+#include <keypad_driver.h>
+#include "settings_app.h"
 
-U8G2_ST7567_ENH_DG128064I_F_HW_I2C u8g2(U8G2_R2);
+service_status_t log_buf;
+uint8_t selected_icon = 0;
 
-#include <TCA9555.h>
-TCA9555 gpioext(0x20);
+// Define App structure for scalable main menu
+typedef struct {
+    const char* name;
+    const unsigned char* icon_full;
+    const unsigned char* icon_small;
+    void (*onLaunch)();
+} App;
 
+// Forward declarations for app launch callbacks
+void launch_settings();
+void launch_music();
+void launch_messages();
 
-void scrDraw_statusBar(uint8_t battery, uint8_t bluetooth, uint8_t cellular,  char* hourStr) {
-    if (hourStr == nullptr) return; // Null check
-    
-    u8g2.clearBuffer();
-    u8g2.setFontMode(1);
-    u8g2.setBitmapMode(1);
-    u8g2.setFont(u8g2_font_6x10_tr); // Set font early
+// Array of apps
+App apps[] = {
+    {"SETTINGS", image_menu_tools_full_bits, image_menu_tools_small_bits, launch_settings},
+    {"MUSIC", image_music_radio_full_bits, image_music_radio_small_bits, launch_music},
+    {"MESSAGES", image_message_mail_full_bits, image_message_mail_small_bits, launch_messages}
+};
 
-    // Battery
-    switch(battery){
-      case 0: u8g2.drawXBM(102, 1, 26, 8, image_Battery_empty_bits); break; 
-      case 1: u8g2.drawXBM(102, 1, 26, 8, image_Battery_low_bits); break;
-      case 2: u8g2.drawXBM(102, 1, 26, 8, image_Battery_mid_bits); break;
-      case 3: u8g2.drawXBM(102, 1, 26, 8, image_Battery_hi_bits); break;
-      case 4: u8g2.drawXBM(102, 1, 26, 8, image_Battery_full_bits); break;
-      default: u8g2.drawXBM(102, 1, 26, 8, image_Battery_empty_bits); break;
+extern "C" void service_log_print_serial(const char *msg) {
+    if (Serial) {
+        Serial.print(msg);
     }
-    // Bluetooth_Idle
-    if(bluetooth == 0){
-      __asm__("NOP");
-    } else if(bluetooth == 1){
-      u8g2.drawXBM(74, 1, 5, 8, image_Bluetooth_Idle_bits);
-    } else if(bluetooth == 2){
-      u8g2.drawXBM(70, 1, 9, 8, image_Bluetooth_Connected_bits);
-    }
-
-    // Status bar line
-    u8g2.drawLine(127, 10, 0, 10);
-
-    // Cellular
-    switch(cellular){
-      case 0: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_none_bits); break;
-      case 1: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_1_bits); break;
-      case 2: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_2_bits); break;
-      case 3: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_3_bits); break;
-      case 4: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_4_bits); break;
-      case 5: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_5_bits); break;
-      default: u8g2.drawXBM(82, 1, 18, 8, image_Cellular_Strenght_none_bits); break;
-    }
-
-    // Clock
-    u8g2.drawStr(1, 9, hourStr); 
-
-
-    u8g2.sendBuffer();
 }
 
-void scrDraw_mainMenu(uint8_t battery, uint8_t bluetooth, uint8_t cellular, uint8_t selectedIcon){
-    scrDraw_statusBar(battery, bluetooth, cellular, "22:36");
-    // App menu
-    selectedIcon = selectedIcon % 3;
-    switch(selectedIcon){
-      case 0: u8g2.drawXBM(50, 20, 28, 32, image_menu_tools_full_bits); // Middle icon
-        u8g2.drawXBM(13, 27, 16, 16, image_message_mail_small_bits); // Left icon
-        u8g2.drawXBM(100, 27, 16, 16, image_music_radio_small_bits); // Right icon
-        u8g2.drawStr(0, 63, "> SETTINGS");
-        break;
+const uint8_t NUM_APPS = sizeof(apps) / sizeof(apps[0]);
 
-        case 1: u8g2.drawXBM(49, 20, 32, 32, image_music_radio_full_bits); // Middle icon
-        u8g2.drawXBM(13, 27, 16, 16, image_menu_tools_small_bits); // Left icon
-        u8g2.drawXBM(100, 27, 16, 16, image_message_mail_small_bits); // Right icon
-        u8g2.drawStr(0, 63, "> MUSIC");
-        break;
-
-        case 2: u8g2.drawXBM(49, 20, 32, 32, image_message_mail_full_bits); // Middle icon
-        u8g2.drawXBM(13, 27, 16, 16, image_music_radio_small_bits); // Left icon
-        u8g2.drawXBM(100, 27, 16, 16, image_menu_tools_small_bits); // Right icon
-        u8g2.drawStr(0, 63, "> MESSAGES");
-        break;
-      
-    }
-
-
-    // Left app frame
-    u8g2.drawFrame(10, 25, 22, 20);
-
-    // Middle app frame
-    u8g2.drawFrame(46, 17, 38, 36);
-    
-    // Right app frame
-    u8g2.drawFrame(97, 25, 22, 20);
-
-    // arrow_right
-    u8g2.drawXBM(87, 33, 7, 5, image_arrow_right_bits);
-
-    // arrow_left
-    u8g2.drawXBM(35, 33, 7, 5, image_arrow_left_bits);
-
+// App launch callbacks
+void launch_settings() {
+    Serial.println("Launching Settings...");
+    settings_run();
 }
 
+void launch_music() {
+    Serial.println("Launching Music...");
+    // Placeholder for music app
+}
 
-  service_status_t log_buf;
+void launch_messages() {
+    Serial.println("Launching Messages...");
+    // Placeholder for messages app
+}
 
 void setup(){
-  delay(5000);
   Serial.begin(115200);
   
-  // POWER through GPIO
-  // pinMode(9, OUTPUT);
-  // pinMode(10, OUTPUT);
-  // digitalWrite(9, HIGH);
-  // digitalWrite(10, LOW);
+  // Start services
+  service_start("display");  
+  service_start("keyboard");
+  service_start("wifi");
 
-  Wire.begin(9,10,100000);
-  u8g2.setI2CAddress(0x3F << 1);
-  u8g2.begin();
-  u8g2.setPowerSave(0);
-  u8g2.setContrast(200);
+  // Configure Time (SNTP) once WiFi is up
+  // Set to simple European timezone as placeholder
+  configTime(2 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
-  u8g2.clearBuffer();
-
-  if (gpioext.begin()) {
-    Serial.println("TCA9555 found!");
-    gpioext.pinMode1(4, OUTPUT);
-    gpioext.write1(4, HIGH);
-  } else {
-    Serial.println("TCA9555 NOT found at 0x20. Check wiring/power.");
-  }
+  // Configure battery ADC (Pin 14)
+  pinMode(14, INPUT);
+  // Initialize settings (loads contrast, etc.)
+  settings_init();
 
   delay(100);
 }
 
-int a,b,c,d=0;
+void run_main_menu() {
+  // Simple test loop
+  char key = keypad.getKey();
+  if (key) {
+    Serial.print("Key Pressed: ");
+    Serial.println(key);
+    
+    // Increment on 'R' (Right), Decrement on 'L' (Left)
+    if (key == 'R') {
+      selected_icon = (selected_icon + 1) % NUM_APPS;
+    } else if (key == 'L') {
+      if (selected_icon == 0) selected_icon = NUM_APPS - 1; // Wrap around
+      else selected_icon--;
+    } else if (key == 'O') {
+      // Launch selected app
+      if (apps[selected_icon].onLaunch) {
+          apps[selected_icon].onLaunch();
+      }
+    }
+    
+    // Prevent rapid scrolling if the key is held down (simple debounce/delay)
+    delay(200); 
+  }
+  
+  // Calculate left and right indices for the menu
+  uint8_t left_icon = (selected_icon == 0) ? NUM_APPS - 1 : selected_icon - 1;
+  uint8_t right_icon = (selected_icon + 1) % NUM_APPS;
+
+  // Sync Hardware state
+  bool bt_on = settings_get_bt();
+  if (bt_on && !esp_bt_controller_get_status()) {
+     // Optional: You could write a bluetooth_service wrapper.
+     // For now this effectively signals intent.
+  }
+  
+  // Read battery ADC and map 0-4095 roughly to 0-4 scale.
+  // Assumes a voltage divider reading roughly 3.3V-4.2V scale as top percent
+  int bat_raw = analogRead(14);
+  int bat_level = 0;
+  if(bat_raw > 1800) bat_level = 1;
+  if(bat_raw > 2200) bat_level = 2;
+  if(bat_raw > 2400) bat_level = 3;
+  if(bat_raw > 2500) bat_level = 4;
+  
+  // Get time from NTP (updates when wifi is connected over SNTP)
+  struct tm timeinfo;
+  char time_str[10] = "--:--";
+  if (getLocalTime(&timeinfo, 10)) {
+     strftime(time_str, sizeof(time_str), "%H:%M", &timeinfo);
+  }
+
+  // Draw current selection
+  gui.drawMainMenu(bat_level, bt_on ? 1 : 0, 0, time_str,
+                   apps[selected_icon].name, 
+                   apps[selected_icon].icon_full, 
+                   apps[left_icon].icon_small, 
+                   apps[right_icon].icon_small,
+                   selected_icon + 1,
+                   NUM_APPS);
+}
+
 void loop(){
-  a++;
-  if (a > 4){
-    a = 0;
-  }
-  b++;
-  if (b > 2){
-    b = 0;
-  }
-  c++;
-  if (c > 5){
-    c = 0;
-  }
-  d++;
-
-  
-  service_start("wifi");
-  service_get_status("wifi", &log_buf);
-  Serial.println(log_buf.log);
-
-  scrDraw_mainMenu(a, b, c, d);
-
-  delay(5000);
-
-
-  service_stop("wifi");
-  service_get_status("wifi", &log_buf);
-  Serial.println(log_buf.log);
-
-  scrDraw_mainMenu(a, b, c, d);
-
-  delay(5000);
-  
-
+  run_main_menu();
+  delay(50); 
 }
