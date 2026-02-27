@@ -39,7 +39,7 @@ static int wifi_start(service_status_t *out){
 }
 
 static int wifi_stop(service_status_t *out){
-    WiFi.disconnect();
+    // WiFi.disconnect();
 
     st.state = SERVICE_STOPPED;
     st.log[0] = '\0';

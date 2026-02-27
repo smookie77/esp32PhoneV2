@@ -4,7 +4,11 @@
 #include <bitmaps.h>
 #include <services.h>
 #include <servicemgr.h>
+
 U8G2_ST7567_ENH_DG128064I_F_HW_I2C u8g2(U8G2_R2);
+
+#include <TCA9555.h>
+TCA9555 gpioext(0x20);
 
 
 void scrDraw_statusBar(uint8_t battery, uint8_t bluetooth, uint8_t cellular,  char* hourStr) {
@@ -101,15 +105,16 @@ void scrDraw_mainMenu(uint8_t battery, uint8_t bluetooth, uint8_t cellular, uint
   service_status_t log_buf;
 
 void setup(){
+  delay(5000);
   Serial.begin(115200);
   
   // POWER through GPIO
-  pinMode(2, OUTPUT);
-  pinMode(42, OUTPUT);
-  digitalWrite(2, HIGH);
-  digitalWrite(42, LOW);
+  // pinMode(9, OUTPUT);
+  // pinMode(10, OUTPUT);
+  // digitalWrite(9, HIGH);
+  // digitalWrite(10, LOW);
 
-  Wire.begin(40,41,1000000);
+  Wire.begin(9,10,100000);
   u8g2.setI2CAddress(0x3F << 1);
   u8g2.begin();
   u8g2.setPowerSave(0);
@@ -117,6 +122,13 @@ void setup(){
 
   u8g2.clearBuffer();
 
+  if (gpioext.begin()) {
+    Serial.println("TCA9555 found!");
+    gpioext.pinMode1(4, OUTPUT);
+    gpioext.write1(4, HIGH);
+  } else {
+    Serial.println("TCA9555 NOT found at 0x20. Check wiring/power.");
+  }
 
   delay(100);
 }
@@ -137,21 +149,23 @@ void loop(){
   }
   d++;
 
+  
   service_start("wifi");
   service_get_status("wifi", &log_buf);
   Serial.println(log_buf.log);
 
-  delay(500);
+  scrDraw_mainMenu(a, b, c, d);
+
+  delay(5000);
+
 
   service_stop("wifi");
   service_get_status("wifi", &log_buf);
   Serial.println(log_buf.log);
 
-  delay(500);
-
   scrDraw_mainMenu(a, b, c, d);
 
-  delay(2000);
+  delay(5000);
   
 
 }

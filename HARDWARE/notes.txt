@@ -1,0 +1,10 @@
+For next pcb revision:
+!!! 5.1k resistors on the USB type C!!!
+3.5mm jack for headphones
+change small ipex to full ipex on sim7680
+improve battery charging
+add more test points
+add indicators for every thing (with solder pads so can be dissabled)
+change LCD to TFT with touchscreen
+  consider co-processor
+

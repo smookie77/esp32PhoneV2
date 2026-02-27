@@ -1,0 +1,3 @@
+Tantalum capacitors polarity
+BOOT and RESET buttons missing
+
