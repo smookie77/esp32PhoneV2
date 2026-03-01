@@ -1,26 +1,35 @@
 #include "settings_app.h"
 #include "phone_gui.h"
 #include "keypad_driver.h"
+// #include "BluetoothA2DPSource.h" // Disabled
+#include "music_app.h"
+// #include "esp_bt_defs.h"
 #include <Preferences.h>
 #include <WiFi.h>
 #include <SPI.h>
 #include <SD.h>
 #include <FS.h>
+#include <vector>
 
 // Global state for settings
 static Preferences prefs;
 static uint8_t current_contrast = 200;
 static bool bluetooth_enabled = false;
 static bool sd_initialized = false;
+static String bt_last_name;
+static std::vector<String> bt_scan_results;
+static bool bt_scanning = false;
+static uint32_t bt_scan_start_ms = 0;
+// extern BluetoothA2DPSource a2dp_source; // Disabled
 
 // Forward declarations for setting callbacks
 static void on_wifi_select();
 static void on_sd_select();
 static void on_contrast_left();
 static void on_contrast_right();
-static void on_bt_left();
-static void on_bt_right();
+// static void on_bt_select(); // Disabled
 static void on_back_select();
+// static bool bt_scan_cb(const char* name, esp_bd_addr_t address, int rssi); // Disabled
 
 // Struct for a setting item
 typedef struct {
@@ -36,16 +45,22 @@ static void draw_contrast(char* buffer, size_t len) {
     snprintf(buffer, len, "Contrast: %d", current_contrast);
 }
 
+/*
 static void draw_bt(char* buffer, size_t len) {
-    snprintf(buffer, len, "Bluetooth: %s", bluetooth_enabled ? "ON" : "OFF");
+    if (bt_last_name.length() > 0) {
+        snprintf(buffer, len, "BT: %s", bt_last_name.c_str());
+    } else {
+        snprintf(buffer, len, "Bluetooth: %s", bluetooth_enabled ? "ON" : "OFF");
+    }
 }
+*/
 
 // The list of settings
 static SettingItem settings[] = {
     {"WiFi Info", on_wifi_select, nullptr, nullptr, nullptr},
     {"SD Card Info", on_sd_select, nullptr, nullptr, nullptr},
     {"Contrast", nullptr, on_contrast_left, on_contrast_right, draw_contrast},
-    {"Bluetooth", nullptr, on_bt_left, on_bt_right, draw_bt},
+    // {"Bluetooth", on_bt_select, nullptr, nullptr, draw_bt}, // Disabled
     {"Back", on_back_select, nullptr, nullptr, nullptr}
 };
 
@@ -138,18 +153,116 @@ static void on_contrast_right() {
     prefs.putUChar("contrast", current_contrast);
 }
 
-static void on_bt_left() {
-    bluetooth_enabled = !bluetooth_enabled;
-    prefs.putBool("bt_en", bluetooth_enabled);
-}
+/*
+static void on_bt_select() {
+    const char* items[] = {"Toggle ON/OFF", "Scan Devices", "Show Paired", "Back"};
+    uint8_t sel = 0;
+    bool exit_menu = false;
+    while (!exit_menu) {
+        gui.drawListMenu("Bluetooth", items, 4, sel);
+        char key = keypad.getKey();
+        if (key) {
+            if (key == 'E') break;
+            else if (key == 'D') sel = (sel + 1) % 4;
+            else if (key == 'U') sel = (sel == 0) ? 3 : sel - 1;
+            else if (key == 'O') {
+                if (sel == 0) {
+                    bluetooth_enabled = !bluetooth_enabled;
+                    prefs.putBool("bt_en", bluetooth_enabled);
+                    if (!bluetooth_enabled) {
+                        a2dp_source.end();
+                    }
+                } else if (sel == 1) {
+                    // Scan for devices and let user pick
+                    bt_scan_results.clear();
+                    bt_scanning = true;
+                    bt_scan_start_ms = millis();
+                    a2dp_source.end();
+                    a2dp_source.set_ssid_callback(bt_scan_cb);
+                    a2dp_source.start();
 
-static void on_bt_right() {
-    on_bt_left(); // Toggle is the same for left/right
-}
+                    uint8_t scan_sel = 0;
+                    bool scan_exit = false;
+                    while (!scan_exit) {
+                        std::vector<const char*> citems;
+                        for (auto &n : bt_scan_results) citems.push_back(n.c_str());
+                        if (citems.empty()) {
+                            const char* msg[] = {"Scanning...", "Press O to cancel"};
+                            gui.drawListMenu("Scan", msg, 2, 0);
+                        } else {
+                            gui.drawListMenu("Scan", citems.data(), citems.size(), scan_sel);
+                        }
 
+                        char k = keypad.getKey();
+                        if (k) {
+                            if (k == 'E') break;
+                            else if (k == 'D' && !citems.empty()) scan_sel = (scan_sel + 1) % citems.size();
+                            else if (k == 'U' && !citems.empty()) scan_sel = (scan_sel == 0) ? citems.size() - 1 : scan_sel - 1;
+                            else if (k == 'O') {
+                                if (citems.empty()) { scan_exit = true; }
+                                else {
+                                    String chosen = bt_scan_results[scan_sel];
+                                    prefs.putString("bt_name", chosen);
+                                    bt_last_name = chosen;
+                                    bluetooth_enabled = true;
+                                    prefs.putBool("bt_en", true);
+                                    // connect to chosen device
+                                    a2dp_source.end();
+                                    a2dp_source.set_ssid_callback(nullptr);
+                                    a2dp_source.start(chosen.c_str());
+                                    scan_exit = true;
+                                }
+                            }
+                            delay(150);
+                        }
+
+                        // stop scan after 10s
+                        if (millis() - bt_scan_start_ms > 10000) {
+                            a2dp_source.cancel_discovery();
+                        }
+                        delay(50);
+                    }
+                    bt_scanning = false;
+                    a2dp_source.cancel_discovery();
+                } else if (sel == 2) {
+                    const char* status = bluetooth_enabled ? "BT ON" : "BT OFF";
+                    char namebuf[48];
+                    if (bt_last_name.length() > 0) snprintf(namebuf, sizeof(namebuf), "Paired: %s", bt_last_name.c_str());
+                    else snprintf(namebuf, sizeof(namebuf), "No paired device");
+                    const char* msg[] = {status, namebuf, "Press O to return"};
+                    gui.drawListMenu("Paired", msg, 3, 2);
+                    while (true) {
+                        char k = keypad.getKey();
+                        if (k == 'O' || k == 'E') break;
+                        delay(50);
+                    }
+                } else {
+                    exit_menu = true;
+                }
+            }
+            delay(150);
+        }
+        delay(50);
+    }
+}
+*/
 static void on_back_select() {
     exit_settings = true;
 }
+
+/*
+static bool bt_scan_cb(const char* name, esp_bd_addr_t address, int rssi) {
+    (void)address;
+    (void)rssi;
+    if (!bt_scanning || !name) return false;
+    String dev = String(name);
+    for (auto &n : bt_scan_results) {
+        if (n == dev) return false;
+    }
+    bt_scan_results.push_back(dev);
+    return false; // keep scanning
+}
+*/
 
 // --- Main Functions ---
 
@@ -157,6 +270,7 @@ void settings_init() {
     prefs.begin("phone_settings", false);
     current_contrast = prefs.getUChar("contrast", 200);
     bluetooth_enabled = prefs.getBool("bt_en", false);
+    bt_last_name = prefs.getString("bt_name", "");
     
     // Apply initial contrast
     gui.setContrast(current_contrast);
@@ -164,6 +278,20 @@ void settings_init() {
 
 bool settings_get_bt() {
     return bluetooth_enabled;
+}
+
+void settings_set_bt_enabled(bool en) {
+    bluetooth_enabled = en;
+    prefs.putBool("bt_en", bluetooth_enabled);
+}
+
+String settings_get_bt_name() {
+    return bt_last_name;
+}
+
+void settings_set_bt_name(const String &name) {
+    bt_last_name = name;
+    prefs.putString("bt_name", bt_last_name);
 }
 
 void settings_run() {

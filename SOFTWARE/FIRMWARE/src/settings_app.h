@@ -11,5 +11,8 @@ void settings_run();
 
 // Access settings logic without UI
 bool settings_get_bt();
+void settings_set_bt_enabled(bool en);
+String settings_get_bt_name();
+void settings_set_bt_name(const String &name);
 
 #endif
