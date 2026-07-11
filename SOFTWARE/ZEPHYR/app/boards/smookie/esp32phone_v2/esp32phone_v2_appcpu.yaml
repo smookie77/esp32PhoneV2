@@ -1,0 +1,9 @@
+identifier: esp32phone_v2/esp32s3/appcpu
+name: esp32PhoneV2 Mainboard APPCPU
+type: mcu
+arch: xtensa
+toolchain:
+  - zephyr
+supported:
+  - uart
+vendor: smookie

@@ -1,0 +1,6 @@
+board:
+  name: esp32phone_v2
+  full_name: esp32PhoneV2 Mainboard
+  vendor: smookie
+  socs:
+  - name: esp32s3

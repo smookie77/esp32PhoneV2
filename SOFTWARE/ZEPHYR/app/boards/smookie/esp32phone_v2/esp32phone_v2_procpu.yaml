@@ -1,0 +1,17 @@
+identifier: esp32phone_v2/esp32s3/procpu
+name: esp32PhoneV2 Mainboard PROCPU
+type: mcu
+arch: xtensa
+toolchain:
+  - zephyr
+supported:
+  - gpio
+  - uart
+  - i2c
+  - i2s
+  - spi
+  - watchdog
+  - entropy
+  - display
+  - input
+vendor: smookie

@@ -11,11 +11,10 @@
 #include "music_app.h"
 #include "Audio.h"
 // #include "BluetoothA2DPSource.h" // Disabled
-#include <freertos/ringbuf.h>
+// #include <freertos/ringbuf.h>
 
-// Audio routing state and buffers
+// Audio routing state
 AudioRoute current_route = ROUTE_I2S;
-RingbufHandle_t audio_buffer = NULL;
 
 Audio audio;
 // BluetoothA2DPSource a2dp_source; // Disabled
@@ -58,7 +57,7 @@ extern "C" void service_log_print_serial(const char *msg) {
 const uint8_t NUM_APPS = sizeof(apps) / sizeof(apps[0]);
 
 // FreeRTOS RingBuffer size (bytes)
-#define AUDIO_BUFFER_SIZE 16384
+// #define AUDIO_BUFFER_SIZE 16384
 
 // ESP32-audioI2S weak callback override
 /*
@@ -98,7 +97,7 @@ void setup(){
   audio.setVolume(15); // Start with moderate volume
 
   // Init ring buffer for BT audio bridge
-  audio_buffer = xRingbufferCreate(AUDIO_BUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);
+  // audio_buffer = xRingbufferCreate(AUDIO_BUFFER_SIZE, RINGBUF_TYPE_BYTEBUF);
 /*
   if (audio_buffer) {
     a2dp_source.set_data_callback(get_bluetooth_data);
@@ -112,7 +111,7 @@ void setup(){
 
   // Configure Time (SNTP) once WiFi is up
   // Set to simple European timezone as placeholder
-  configTime(2 * 3600, 0, "pool.ntp.org", "time.nist.gov");
+  configTime(3 * 3600, 0, "pool.ntp.org", "time.nist.gov");
 
   // Configure battery ADC (Pin 14)
   pinMode(14, INPUT);

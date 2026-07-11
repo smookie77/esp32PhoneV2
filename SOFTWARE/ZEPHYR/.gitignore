@@ -1,0 +1,8 @@
+# west workspace artifacts (fetched by `west update`, never committed)
+.west/
+.venv/
+zephyr/
+modules/
+bootloader/
+tools/
+build/

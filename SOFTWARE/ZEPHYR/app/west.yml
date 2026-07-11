@@ -1,0 +1,21 @@
+manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos
+
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.4.1
+      import:
+        # Keep the workspace lean: only the modules this project needs.
+        # Extend the allowlist (and `west update`) when a milestone needs more
+        # (e.g. mbedtls for TLS, mcuboot for OTA).
+        name-allowlist:
+          - hal_espressif
+          - lvgl
+          - littlefs
+          - fatfs
+
+  self:
+    path: app

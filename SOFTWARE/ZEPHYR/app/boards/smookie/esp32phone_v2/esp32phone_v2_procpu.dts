@@ -1,0 +1,184 @@
+/*
+ * esp32PhoneV2 Mainboard (PCB4) — PROCPU
+ *
+ * GPIO map (from Mainboard_schematics.pdf):
+ *   IO0  BOOT button          IO15 modem TX
+ *   IO2  SD SCK               IO16 modem RX
+ *   IO3  amp SD_MODE          IO17 modem RI
+ *   IO4  I2S LRC/FSYNC        IO18 modem PWRKEY
+ *   IO5  I2S BCLK             IO19/20 USB D-/D+
+ *   IO6  DAC DIN              IO42 SD CS
+ *   IO7  ADC SDOUT            IO43 SD MOSI
+ *   IO8  modem RST            IO44 SD MISO
+ *   IO9/10 I2C SDA/SCL
+ *   Spare (EXT header): IO1, IO11-14, IO21, IO38-41, IO47, IO48
+ */
+/dts-v1/;
+
+#include <espressif/esp32s3/esp32s3_wroom_n16r8.dtsi>
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+#include <espressif/partitions_0x0_amp_16M.dtsi>
+#include "esp32phone_v2-pinctrl.dtsi"
+
+/ {
+	model = "esp32PhoneV2 Mainboard PROCPU";
+	compatible = "espressif,esp32s3";
+
+	aliases {
+		i2c-0 = &i2c0;
+		watchdog0 = &wdt0;
+		sw0 = &button0;
+		sdhc0 = &sd0;
+	};
+
+	chosen {
+		zephyr,sram = &sram1;
+		zephyr,console = &usb_serial;
+		zephyr,shell-uart = &usb_serial;
+		zephyr,flash = &flash0;
+		zephyr,code-partition = &slot0_partition;
+		zephyr,bt-hci = &esp32_bt_hci;
+		zephyr,display = &st7567;
+	};
+
+	buttons {
+		compatible = "gpio-keys";
+
+		button0: button_0 {
+			gpios = <&gpio0 0 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+			label = "BOOT Button";
+			zephyr,code = <INPUT_KEY_0>;
+		};
+	};
+
+	/* Board control lines owned by firmware services */
+	zephyr_user: zephyr,user {
+		amp-sd-mode-gpios = <&gpio0 3 GPIO_ACTIVE_HIGH>;  /* MAX98357A enable */
+		modem-ri-gpios = <&gpio0 17 GPIO_ACTIVE_LOW>;     /* A7680C ring indicator */
+	};
+};
+
+&usb_serial {
+	status = "okay";
+};
+
+&gpio0 {
+	status = "okay";
+};
+
+&gpio1 {
+	status = "okay";
+};
+
+&i2c0 {
+	status = "okay";
+	clock-frequency = <I2C_BITRATE_FAST>;
+	pinctrl-0 = <&i2c0_default>;
+	pinctrl-names = "default";
+
+	/*
+	 * Matches the known-good U8g2 init (ENH_DG128064I + U8G2_R2):
+	 * SEG normal + COM flipped = that panel's 180° orientation,
+	 * offset 0, RR=3, 1/9 bias. Contrast (EV 50) is set at runtime —
+	 * ST7567_DEFAULT_CONTRAST is capped at 15.
+	 */
+	st7567: st7567@3f {
+		compatible = "sitronix,st7567";
+		reg = <0x3f>;
+		width = <128>;
+		height = <64>;
+		column-offset = <0>;
+		line-offset = <0>;
+		regulation-ratio = <3>;
+		com-invdir;
+	};
+
+	tca9555: tca9555@20 {
+		compatible = "nxp,pca9555";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+		ngpios = <16>;
+	};
+};
+
+/* A7680C LTE Cat-1 modem (keypad-side of TXS0108E level shifter) */
+&uart1 {
+	status = "okay";
+	current-speed = <115200>;
+	pinctrl-0 = <&uart1_default>;
+	pinctrl-names = "default";
+
+	modem: modem {
+		compatible = "simcom,a76xx";
+		mdm-power-gpios = <&gpio0 18 GPIO_ACTIVE_HIGH>;
+		mdm-reset-gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+		status = "disabled";	/* enabled in M2 (telephony) */
+	};
+};
+
+/* Audio bus — enabled in M3 (media) */
+&i2s0 {
+	pinctrl-0 = <&i2s0_default>;
+	pinctrl-names = "default";
+};
+
+/* micro-SD (TF1), SPI mode */
+&spi2 {
+	#address-cells = <1>;
+	#size-cells = <0>;
+	status = "okay";
+	pinctrl-0 = <&spim2_default>;
+	pinctrl-names = "default";
+	/* GPIO CS, not hardware CSEL: SD init needs frames with CS deasserted */
+	cs-gpios = <&gpio1 10 GPIO_ACTIVE_LOW>;
+
+	sd0: sdhc@0 {
+		compatible = "zephyr,sdhc-spi-slot";
+		reg = <0>;
+		spi-max-frequency = <20000000>;
+		status = "okay";
+
+		mmc {
+			compatible = "zephyr,sdmmc-disk";
+			disk-name = "SD";
+			status = "okay";
+		};
+	};
+};
+
+&timer0 {
+	status = "disabled";
+};
+
+&timer1 {
+	status = "disabled";
+};
+
+&timer2 {
+	status = "disabled";
+};
+
+&timer3 {
+	status = "disabled";
+};
+
+&wdt0 {
+	status = "okay";
+};
+
+&trng0 {
+	status = "okay";
+};
+
+&esp32_bt_hci {
+	status = "okay";
+};
+
+&wifi {
+	status = "okay";
+};
+
+zephyr_udc0: &usb_otg {
+	status = "okay";
+};

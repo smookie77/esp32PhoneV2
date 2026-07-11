@@ -30,6 +30,7 @@ bool KeypadDriver::begin() {
 }
 
 char KeypadDriver::getKey() {
+    delay(20);
     for (int c = 0; c < KEYPAD_COLS; c++) {
         // Activate column (Active LOW)
         _gpio.write1(_colPins[c], LOW);
